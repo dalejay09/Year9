@@ -210,3 +210,42 @@ def run_app():
             st.toggle("Canvas Controls", key="show_controls", on_change=handle_settings_change)
 
     if st.session_state.generating:
+        with st.spinner("Loading next question..."):
+            p_data = generate_forces_problem(quiz_style=st.session_state.quiz_style)
+            st.session_state.science_problem_data = p_data
+            if p_data["mode"] == "Written":
+                st.session_state.problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
+            st.session_state.generating = False
+            st.rerun()
+
+    else:
+        p_data = st.session_state.science_problem_data
+        
+        if p_data["mode"] == "MCQ":
+            st.write(f"### {p_data['text']}")
+            for idx, opt in enumerate(p_data["options"]):
+                if st.button(opt, use_container_width=True, key=f"mcq_{idx}_{st.session_state.problem_suite_refresh_id}"):
+                    if opt == p_data["ans"]:
+                        st.success("✅ Correct!")
+                    else:
+                        st.error(f"❌ Incorrect. The correct answer is: {p_data['ans']}")
+        else:
+            bg_image = st.session_state.problem_image_context
+            
+            # Blind Marker: AI only gets the question context, no answer key!
+            problem_context = f"Science Question: {p_data['text']}"
+            
+            ai_marking_component.render_grading_suite(
+                bg_image=bg_image,
+                height_px=420,
+                key_prefix=f"sci_suite_{st.session_state.problem_suite_refresh_id}",
+                solution_requirement="general",
+                problem_context=problem_context,
+                show_controls=st.session_state.get('show_controls', False),
+                camera_mode=st.session_state.get('camera_mode', 'App')
+            )
+
+        st.markdown('<div id="next-problem-btn"></div>', unsafe_allow_html=True)
+        if st.button("Next Question", use_container_width=True):
+            handle_settings_change()
+            st.rerun()
