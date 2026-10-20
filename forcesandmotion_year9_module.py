@@ -17,8 +17,8 @@ class AIWorksheetSolutions(BaseModel):
     solutions: list[str]
 
 # --- Science Engine: MOTION & FORCES ---
-def generate_forces_problem(level="1"):
-    # Pool 1: Multiple Choice Concepts (Waiuku PDF Section A)
+def generate_forces_problem(level="1", quiz_style="Both"):
+    # Pool 1: Multiple Choice Concepts
     mcq_pool = [
         {"q": "A force is best described as:", "ans": "A push or a pull", "distractors": ["Energy stored in an object", "Matter moving through space", "Mass × speed"]},
         {"q": "Which of the following is a non-contact force?", "ans": "Gravity", "distractors": ["Friction", "Air resistance", "Upthrust"]},
@@ -32,7 +32,7 @@ def generate_forces_problem(level="1"):
         {"q": "A floating boat experiences:", "ans": "Balanced weight and upthrust", "distractors": ["Weight only", "Upthrust only", "Friction only"]}
     ]
 
-    # Pool 2: Written / Calculation Concepts (Waiuku PDF Sections B, C, D)
+    # Pool 2: Written / Calculation Concepts
     written_pool = [
         {"type": "define", "term": "Velocity", "ans": "Speed in a given direction (vector quantity)."},
         {"type": "define", "term": "Acceleration", "ans": "The rate of change of velocity over time."},
@@ -43,7 +43,14 @@ def generate_forces_problem(level="1"):
         {"type": "calc_fma_mass", "context": "A skateboard is pushed with a force of {f} N and accelerates at {a} m/s². Calculate its mass."}
     ]
 
-    if random.choice(["MCQ", "Written"]) == "MCQ":
+    if quiz_style == "Multiple Choice":
+        choice = "MCQ"
+    elif quiz_style == "Written Answers":
+        choice = "Written"
+    else:
+        choice = random.choice(["MCQ", "Written"])
+
+    if choice == "MCQ":
         item = random.choice(mcq_pool)
         options = item["distractors"] + [item["ans"]]
         random.shuffle(options)
@@ -52,26 +59,26 @@ def generate_forces_problem(level="1"):
         item = random.choice(written_pool)
         if item["type"] == "define":
             text = f"Define the following term:\n\n{item['term']}"
-            return {"mode": "Written", "text": text, "ans": item["ans"], "req": "demonstrated"}
+            return {"mode": "Written", "text": text, "ans": item["ans"]}
         elif item["type"] == "explain" or item["type"] == "state":
             text = f"{item['term']}"
-            return {"mode": "Written", "text": text, "ans": item["ans"], "req": "demonstrated"}
+            return {"mode": "Written", "text": text, "ans": item["ans"]}
         elif item["type"] == "calc_net":
             f1, f2 = random.randint(500, 900), random.randint(100, 300)
             text = item["context"].format(f1=f1, f2=f2) + "\n\nCalculate the net force and state its direction."
             ans = f"{f1 - f2} N forward"
-            return {"mode": "Written", "text": text, "ans": ans, "req": "numeric"}
+            return {"mode": "Written", "text": text, "ans": ans}
         elif item["type"] == "calc_fma":
             m, a = random.randint(2, 12), random.randint(2, 8)
             text = item["context"].format(m=m, a=a)
             ans = f"{m * a} N"
-            return {"mode": "Written", "text": text, "ans": ans, "req": "numeric"}
+            return {"mode": "Written", "text": text, "ans": ans}
         elif item["type"] == "calc_fma_mass":
             m, a = random.randint(2, 10), random.randint(2, 6)
             f = m * a
             text = item["context"].format(f=f, a=a)
             ans = f"{m} kg"
-            return {"mode": "Written", "text": text, "ans": ans, "req": "numeric"}
+            return {"mode": "Written", "text": text, "ans": ans}
 
 # --- Visual Engine ---
 def draw_question_image(text, width_px=420, height_px=760):
@@ -91,10 +98,10 @@ def draw_question_image(text, width_px=420, height_px=760):
     return Image.open(buf).convert('RGBA').copy()
 
 # --- Worksheet PDF Generator ---
-def create_pdf_bytes():
+def create_pdf_bytes(quiz_style="Both"):
     buffer = io.BytesIO()
     with PdfPages(buffer) as pdf:
-        problems = [generate_forces_problem() for _ in range(20)]
+        problems = [generate_forces_problem(quiz_style=quiz_style) for _ in range(20)]
         
         fig_ws, axes = plt.subplots(5, 4, figsize=(8.27, 11.69))
         fig_ws.subplots_adjust(left=0.04, right=0.96, top=0.92, bottom=0.04, wspace=0.15, hspace=0.30)
@@ -153,6 +160,7 @@ def run_app():
     if 'generating' not in st.session_state: st.session_state.generating = True
     if 'pdf_bytes' not in st.session_state: st.session_state.pdf_bytes = None
     if 'problem_suite_refresh_id' not in st.session_state: st.session_state.problem_suite_refresh_id = 0
+    if 'quiz_style' not in st.session_state: st.session_state.quiz_style = "Both"
 
     st.title("Motion & Forces Quiz 🚀")
 
@@ -162,7 +170,7 @@ def run_app():
             if st.session_state.pdf_bytes is None:
                 if st.button("⚙️ Generate 20-Question PDF", use_container_width=True):
                     with st.spinner("Compiling PDF..."):
-                        st.session_state.pdf_bytes = create_pdf_bytes()
+                        st.session_state.pdf_bytes = create_pdf_bytes(st.session_state.quiz_style)
                     st.rerun()
             else:
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -170,12 +178,13 @@ def run_app():
 
     with col_set:
         with st.popover("⚙️", use_container_width=True):
+            st.radio("Quiz Style", ["Multiple Choice", "Written Answers", "Both"], key="quiz_style", on_change=handle_settings_change)
             st.radio("Camera Mode", ["None", "App", "Native"], key="camera_mode", horizontal=True, on_change=handle_settings_change)
             st.toggle("Canvas Controls", key="show_controls", on_change=handle_settings_change)
 
     if st.session_state.generating:
         with st.spinner("Loading next question..."):
-            p_data = generate_forces_problem()
+            p_data = generate_forces_problem(quiz_style=st.session_state.quiz_style)
             st.session_state.science_problem_data = p_data
             if p_data["mode"] == "Written":
                 st.session_state.problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
@@ -195,13 +204,15 @@ def run_app():
                         st.error(f"❌ Incorrect. The correct answer is: {p_data['ans']}")
         else:
             bg_image = st.session_state.problem_image_context
-            problem_context = f"Science Question: {p_data['text']}\nCorrect Answer/Concept: {p_data['ans']}"
+            
+            # --- The AI no longer receives the 'ans' parameter! It figures it out itself. ---
+            problem_context = f"Science Question: {p_data['text']}"
             
             ai_marking_component.render_grading_suite(
                 bg_image=bg_image,
                 height_px=420,
                 key_prefix=f"sci_suite_{st.session_state.problem_suite_refresh_id}",
-                solution_requirement=p_data["req"],
+                solution_requirement="general",
                 problem_context=problem_context,
                 show_controls=st.session_state.get('show_controls', False),
                 camera_mode=st.session_state.get('camera_mode', 'App')
