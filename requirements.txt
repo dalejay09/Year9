@@ -1,7 +1,8 @@
 streamlit
-pandas
-google-generativeai
-pillow
-gspread
-google-auth
-PyMuPDF
+streamlit-drawable-canvas
+matplotlib
+numpy
+Pillow
+google-genai
+fpdf2
+pydantic
