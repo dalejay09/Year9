@@ -29,15 +29,28 @@ def generate_forces_problem(level="1", quiz_style="Both"):
         {"q": "A floating boat experiences:", "ans": "Balanced weight and upthrust", "distractors": ["Weight only", "Upthrust only", "Friction only"]}
     ]
 
-    # Pool 2: Written / Calculation Concepts
+    # Pool 2: Written / Calculation Concepts (Now expanded to 17 total questions)
     written_pool = [
+        # Original 7
         {"type": "define", "term": "Velocity", "ans": "Speed in a given direction (vector quantity)."},
         {"type": "define", "term": "Acceleration", "ans": "The rate of change of velocity over time."},
-        {"type": "explain", "term": "Difference between mass and weight", "ans": "Mass is the amount of matter (kg), weight is the force of gravity acting on that mass (N)."},
-        {"type": "state", "term": "Newton's Third Law", "ans": "For every action force, there is an equal and opposite reaction force."},
+        {"type": "explain", "term": "Explain the difference between mass and weight.", "ans": "Mass is the amount of matter (kg), weight is the force of gravity acting on that mass (N)."},
+        {"type": "state", "term": "State Newton's Third Law.", "ans": "For every action force, there is an equal and opposite reaction force."},
         {"type": "calc_net", "context": "A car experiences a driving force of {f1} N forward and friction of {f2} N backward."},
         {"type": "calc_fma", "context": "Calculate the force required to accelerate a {m} kg mass at {a} m/s²."},
-        {"type": "calc_fma_mass", "context": "A skateboard is pushed with a force of {f} N and accelerates at {a} m/s². Calculate its mass."}
+        {"type": "calc_fma_mass", "context": "A skateboard is pushed with a force of {f} N and accelerates at {a} m/s². Calculate its mass."},
+        
+        # New 10 Added
+        {"type": "define", "term": "Friction", "ans": "A contact force that opposes motion between two surfaces."},
+        {"type": "define", "term": "Net Force", "ans": "The overall or total force acting on an object when all individual forces are combined."},
+        {"type": "state", "term": "State Newton's First Law.", "ans": "An object will remain at rest or move at a constant speed in a straight line unless acted upon by an unbalanced force."},
+        {"type": "state", "term": "State Newton's Second Law.", "ans": "Force equals mass multiplied by acceleration (F = ma)."},
+        {"type": "explain", "term": "What happens to a moving car if the forward engine force and the backward friction force are exactly equal (balanced)?", "ans": "The car will continue moving at a constant speed (zero acceleration)."},
+        {"type": "explain", "term": "Explain how action and reaction forces allow a rocket to lift off the ground.", "ans": "The rocket pushes exhaust gases downwards (action), and the gases push the rocket upwards with an equal and opposite force (reaction)."},
+        {"type": "explain", "term": "A book rests on a table. Name the downward force and the upward support force acting on it.", "ans": "Downward force: Gravity (or Weight). Upward force: Normal force (or Support force)."},
+        {"type": "calc_fma_accel", "context": "A force of {f} N is applied to a {m} kg box. Calculate its acceleration."},
+        {"type": "calc_weight", "context": "Calculate the weight of a {m} kg object on Earth. (Assume gravity g = 10 N/kg)."},
+        {"type": "calc_net_accel", "context": "A boat's engine provides a forward force of {f1} N, and water resistance pulls backward with {f1} N. What is the net force, and will the boat accelerate?"}
     ]
 
     # 50/50 Likelihood Router
@@ -76,6 +89,22 @@ def generate_forces_problem(level="1", quiz_style="Both"):
             f = m * a
             text = item["context"].format(f=f, a=a)
             ans = f"{m} kg"
+            return {"mode": "Written", "text": text, "ans": ans}
+        elif item["type"] == "calc_fma_accel":
+            m, a = random.randint(2, 10), random.randint(2, 8)
+            f = m * a
+            text = item["context"].format(f=f, m=m)
+            ans = f"{a} m/s²"
+            return {"mode": "Written", "text": text, "ans": ans}
+        elif item["type"] == "calc_weight":
+            m = random.randint(5, 50)
+            text = item["context"].format(m=m)
+            ans = f"{m * 10} N"
+            return {"mode": "Written", "text": text, "ans": ans}
+        elif item["type"] == "calc_net_accel":
+            f1 = random.randint(300, 800)
+            text = item["context"].format(f1=f1)
+            ans = "Net force is 0 N. It will not accelerate."
             return {"mode": "Written", "text": text, "ans": ans}
 
 # --- Visual Engine ---
@@ -181,42 +210,3 @@ def run_app():
             st.toggle("Canvas Controls", key="show_controls", on_change=handle_settings_change)
 
     if st.session_state.generating:
-        with st.spinner("Loading next question..."):
-            p_data = generate_forces_problem(quiz_style=st.session_state.quiz_style)
-            st.session_state.science_problem_data = p_data
-            if p_data["mode"] == "Written":
-                st.session_state.problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
-            st.session_state.generating = False
-            st.rerun()
-
-    else:
-        p_data = st.session_state.science_problem_data
-        
-        if p_data["mode"] == "MCQ":
-            st.write(f"### {p_data['text']}")
-            for idx, opt in enumerate(p_data["options"]):
-                if st.button(opt, use_container_width=True, key=f"mcq_{idx}_{st.session_state.problem_suite_refresh_id}"):
-                    if opt == p_data["ans"]:
-                        st.success("✅ Correct!")
-                    else:
-                        st.error(f"❌ Incorrect. The correct answer is: {p_data['ans']}")
-        else:
-            bg_image = st.session_state.problem_image_context
-            
-            # Blind Marker: AI only gets the question context, no answer key!
-            problem_context = f"Science Question: {p_data['text']}"
-            
-            ai_marking_component.render_grading_suite(
-                bg_image=bg_image,
-                height_px=420,
-                key_prefix=f"sci_suite_{st.session_state.problem_suite_refresh_id}",
-                solution_requirement="general",
-                problem_context=problem_context,
-                show_controls=st.session_state.get('show_controls', False),
-                camera_mode=st.session_state.get('camera_mode', 'App')
-            )
-
-        st.markdown('<div id="next-problem-btn"></div>', unsafe_allow_html=True)
-        if st.button("Next Question", use_container_width=True):
-            handle_settings_change()
-            st.rerun()
