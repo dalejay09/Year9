@@ -90,7 +90,7 @@ def generate_forces_problem(quiz_style="Both"):
         return item
     else:
         item = random.choice(written_pool).copy()
-        item["mode"] = "Written" # Safety tag to prevent KeyError crashes!
+        item["mode"] = "Written"
         
         if item["class"] == 3:
             if item["type"] == "define":
@@ -140,12 +140,11 @@ def get_next_question():
     if mode == "Random":
         return generate_forces_problem(quiz_style=quiz_style)
         
-    # Build a fresh queue if empty
-    if 'question_queue' not in st.session_state or not st.session_state.question_queue:
+    if 'sci_question_queue' not in st.session_state or not st.session_state.sci_question_queue:
         if mode == "Quiz":
-            st.session_state.quiz_score = 0
-            st.session_state.questions_answered = 0
-            st.session_state.quiz_completed = False
+            st.session_state.sci_quiz_score = 0
+            st.session_state.sci_questions_answered = 0
+            st.session_state.sci_quiz_completed = False
             
         mcq_pool, written_pool = get_all_problems()
         combined_pool = []
@@ -154,19 +153,17 @@ def get_next_question():
         
         random.shuffle(combined_pool)
         
-        # Limit Quiz mode to 20 questions
         if mode == "Quiz" and len(combined_pool) > 20:
             combined_pool = combined_pool[:20]
             
-        st.session_state.question_queue = combined_pool
+        st.session_state.sci_question_queue = combined_pool
         
-    if mode == "Quiz" and not st.session_state.question_queue:
-        st.session_state.quiz_completed = True
+    if mode == "Quiz" and not st.session_state.sci_question_queue:
+        st.session_state.sci_quiz_completed = True
         return None
         
-    raw_item = st.session_state.question_queue.pop(0)
+    raw_item = st.session_state.sci_question_queue.pop(0)
     
-    # Process the raw item from the queue into the generated format
     if raw_item.get("mode") == "MCQ":
         options = raw_item["distractors"] + [raw_item["ans"]]
         random.shuffle(options)
@@ -174,11 +171,8 @@ def get_next_question():
         raw_item["text"] = raw_item.get("q", raw_item.get("text"))
         return raw_item
     else:
-        # Ensure the mode tag is safely passed to prevent KeyError
         raw_item["mode"] = "Written"
-        
         if raw_item["class"] == 4:
-            # We must regenerate variables if class 4 so it's not a template string
             if raw_item["type"] == "calc_net":
                 f1, f2 = random.randint(500, 900), random.randint(100, 300)
                 text = raw_item["context"].format(f1=f1, f2=f2) + "\n\nCalculate the net force and state its direction."
@@ -234,7 +228,6 @@ def draw_question_image(text, width_px=420, height_px=760):
     buf.seek(0)
     return Image.open(buf).convert('RGBA').copy()
 
-# --- Worksheet PDF Generator ---
 def create_pdf_bytes(quiz_style="Both"):
     buffer = io.BytesIO()
     with PdfPages(buffer) as pdf:
@@ -270,15 +263,14 @@ def create_pdf_bytes(quiz_style="Both"):
     return buffer.getvalue()
 
 def handle_settings_change():
-    st.session_state.generating = True
-    st.session_state.pdf_bytes = None
-    st.session_state.problem_suite_refresh_id += 1 
-    # Reset queues and quiz states on setting change
-    st.session_state.question_queue = []
-    st.session_state.quiz_active = False
-    st.session_state.quiz_score = 0
-    st.session_state.questions_answered = 0
-    st.session_state.quiz_completed = False
+    st.session_state.sci_generating = True
+    st.session_state.sci_pdf_bytes = None
+    st.session_state.sci_problem_suite_refresh_id += 1 
+    st.session_state.sci_question_queue = []
+    st.session_state.sci_quiz_active = False
+    st.session_state.sci_quiz_score = 0
+    st.session_state.sci_questions_answered = 0
+    st.session_state.sci_quiz_completed = False
 
 # --- START OF MODULE WRAPPER ---
 def run_app():
@@ -295,28 +287,27 @@ def run_app():
         </style>
     """, unsafe_allow_html=True)
 
-    if 'generating' not in st.session_state: st.session_state.generating = True
-    if 'pdf_bytes' not in st.session_state: st.session_state.pdf_bytes = None
-    if 'problem_suite_refresh_id' not in st.session_state: st.session_state.problem_suite_refresh_id = 0
+    if 'sci_generating' not in st.session_state: st.session_state.sci_generating = True
+    if 'sci_pdf_bytes' not in st.session_state: st.session_state.sci_pdf_bytes = None
+    if 'sci_problem_suite_refresh_id' not in st.session_state: st.session_state.sci_problem_suite_refresh_id = 0
     if 'quiz_style' not in st.session_state: st.session_state.quiz_style = "Both"
     if 'selection_mode' not in st.session_state: st.session_state.selection_mode = "Random"
-    if 'quiz_active' not in st.session_state: st.session_state.quiz_active = False
-    if 'questions_answered' not in st.session_state: st.session_state.questions_answered = 0
+    if 'sci_quiz_active' not in st.session_state: st.session_state.sci_quiz_active = False
+    if 'sci_questions_answered' not in st.session_state: st.session_state.sci_questions_answered = 0
 
     st.title("Motion & Forces Quiz 🚀")
 
-    # FIXED COLUMNS: Gives the mobile gear icon enough space to render
     col_actions, col_set = st.columns([4, 1])
     with col_actions:
         with st.popover("📄 Worksheet Actions", use_container_width=True):
-            if st.session_state.pdf_bytes is None:
+            if st.session_state.sci_pdf_bytes is None:
                 if st.button("⚙️ Generate 20-Question PDF", use_container_width=True):
                     with st.spinner("Compiling PDF..."):
-                        st.session_state.pdf_bytes = create_pdf_bytes(st.session_state.quiz_style)
+                        st.session_state.sci_pdf_bytes = create_pdf_bytes(st.session_state.quiz_style)
                     st.rerun()
             else:
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                st.download_button("⬇️ Download Worksheet", data=st.session_state.pdf_bytes, file_name=f"Forces_Motion_{timestamp}.pdf", mime="application/pdf", use_container_width=True, type="primary")
+                st.download_button("⬇️ Download Worksheet", data=st.session_state.sci_pdf_bytes, file_name=f"Forces_Motion_{timestamp}.pdf", mime="application/pdf", use_container_width=True, type="primary")
 
     with col_set:
         with st.popover("⚙️", use_container_width=True):
@@ -326,9 +317,9 @@ def run_app():
             st.toggle("Canvas Controls", key="show_controls", on_change=handle_settings_change)
 
     # --- START SCREEN GATE ---
-    if st.session_state.selection_mode == "Quiz" and not st.session_state.quiz_active:
-        if st.session_state.get('quiz_completed', False):
-            st.success(f"🎉 Quiz Complete! You scored {st.session_state.quiz_score} out of {st.session_state.questions_answered}.")
+    if st.session_state.selection_mode == "Quiz" and not st.session_state.sci_quiz_active:
+        if st.session_state.get('sci_quiz_completed', False):
+            st.success(f"🎉 Quiz Complete! You scored {st.session_state.sci_quiz_score} out of {st.session_state.sci_questions_answered}.")
             if st.button("Restart Quiz"):
                 handle_settings_change()
                 st.rerun()
@@ -336,32 +327,34 @@ def run_app():
             
         st.info("Ready to test your knowledge? This quiz will generate 20 random questions based on your style settings.")
         if st.button("🚀 Start 20-Question Quiz", use_container_width=True, type="primary"):
-            st.session_state.quiz_active = True
-            st.session_state.quiz_score = 0
-            st.session_state.questions_answered = 0
+            st.session_state.sci_quiz_active = True
+            st.session_state.sci_quiz_score = 0
+            st.session_state.sci_questions_answered = 0
             st.rerun()
         return
 
     # --- RUNNING SCORE DASHBOARD ---
-    if st.session_state.selection_mode == "Quiz" and st.session_state.quiz_active:
+    if st.session_state.selection_mode == "Quiz" and st.session_state.sci_quiz_active:
         col1, col2, col3 = st.columns(3)
-        col1.metric("Score", f"{st.session_state.quiz_score}")
-        col2.metric("Question", f"{st.session_state.questions_answered + 1} / 20")
-        acc = int((st.session_state.quiz_score / max(1, st.session_state.questions_answered)) * 100) if st.session_state.questions_answered > 0 else 0
+        col1.metric("Score", f"{st.session_state.sci_quiz_score}")
+        col2.metric("Question", f"{st.session_state.sci_questions_answered + 1} / 20")
+        acc = int((st.session_state.sci_quiz_score / max(1, st.session_state.sci_questions_answered)) * 100) if st.session_state.sci_questions_answered > 0 else 0
         col3.metric("Accuracy", f"{acc}%")
         st.divider()
 
-    if st.session_state.generating:
+    # Safety catch: If science_problem_data is missing, force a generation
+    if st.session_state.sci_generating or 'science_problem_data' not in st.session_state:
+        st.session_state.sci_generating = True
         with st.spinner("Loading next question..."):
             p_data = get_next_question()
             if p_data is None: 
-                st.session_state.quiz_active = False # End quiz mode
+                st.session_state.sci_quiz_active = False 
                 st.rerun() 
                 
             st.session_state.science_problem_data = p_data
             if p_data["mode"] == "Written":
                 st.session_state.problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
-            st.session_state.generating = False
+            st.session_state.sci_generating = False
             st.rerun()
 
     else:
@@ -372,21 +365,21 @@ def run_app():
             
             selected_opt = None
             for idx, opt in enumerate(p_data["options"]):
-                if st.button(opt, use_container_width=True, key=f"mcq_{idx}_{st.session_state.problem_suite_refresh_id}"):
+                if st.button(opt, use_container_width=True, key=f"mcq_{idx}_{st.session_state.sci_problem_suite_refresh_id}"):
                     selected_opt = opt
                     
             if selected_opt is not None:
                 is_correct = (selected_opt == p_data["ans"])
-                st.session_state.questions_answered += 1
+                st.session_state.sci_questions_answered += 1
                 
                 if is_correct:
                     st.success("✅ Correct!")
                     if st.session_state.selection_mode == "Quiz": 
-                        st.session_state.quiz_score += 1
+                        st.session_state.sci_quiz_score += 1
                 else:
                     st.error(f"❌ Incorrect. The correct answer is: {p_data['ans']}")
                     if st.session_state.selection_mode == "Rehearse":
-                        st.session_state.question_queue.append(p_data)
+                        st.session_state.sci_question_queue.append(p_data)
         else:
             bg_image = st.session_state.problem_image_context
             problem_context = f"Question: {p_data['text']}\nGrading Rule: {p_data.get('grading_rule', '')}"
@@ -394,19 +387,17 @@ def run_app():
             ai_marking_component.render_grading_suite(
                 bg_image=bg_image,
                 height_px=420,
-                key_prefix=f"sci_suite_{st.session_state.problem_suite_refresh_id}",
+                key_prefix=f"sci_suite_{st.session_state.sci_problem_suite_refresh_id}",
                 solution_requirement="general",
                 problem_context=problem_context,
                 show_controls=st.session_state.get('show_controls', False),
                 camera_mode=st.session_state.get('camera_mode', 'App')
             )
-            # Note: For written questions, the tallying logic will be fully active once ai_marking_component 
-            # is updated to return the boolean success state to the main app loop!
 
         st.markdown('<div id="next-problem-btn"></div>', unsafe_allow_html=True)
         if st.button("Next Question", use_container_width=True):
             if st.session_state.selection_mode == "Cyclical":
-                st.session_state.question_queue.append(p_data)
-            st.session_state.generating = True
-            st.session_state.problem_suite_refresh_id += 1 
+                st.session_state.sci_question_queue.append(p_data)
+            st.session_state.sci_generating = True
+            st.session_state.sci_problem_suite_refresh_id += 1 
             st.rerun()
