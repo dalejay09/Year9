@@ -8,13 +8,11 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from datetime import datetime
 from matplotlib.backends.backend_pdf import PdfPages
-from pydantic import BaseModel
 
 import ai_marking_component
 
 # --- Science Engine: MOTION & FORCES ---
 def get_all_problems():
-    # Pool 1: Multiple Choice Concepts (Class 1) - 30 Questions
     mcq_pool = [
         {"class": 1, "mode": "MCQ", "q": "A force is best described as:", "ans": "A push or a pull", "distractors": ["Energy stored in an object", "Matter moving through space", "Mass × speed"], "grading_rule": "Exact match multiple choice."},
         {"class": 1, "mode": "MCQ", "q": "Which of the following is a non-contact force?", "ans": "Gravity", "distractors": ["Friction", "Air resistance", "Upthrust"], "grading_rule": "Exact match multiple choice."},
@@ -48,7 +46,6 @@ def get_all_problems():
         {"class": 1, "mode": "MCQ", "q": "A moving object with zero net force acting upon it will:", "ans": "Keep moving at the exact same speed and direction", "distractors": ["Slow down and eventually stop", "Constantly accelerate", "Fall to the ground immediately"], "grading_rule": "Exact match multiple choice."}
     ]
 
-    # Pool 2: Written / Calculation Concepts - 17 Questions
     written_pool = [
         {"class": 3, "type": "define", "term": "Velocity", "ans": "Speed in a given direction (vector quantity)."},
         {"class": 3, "type": "define", "term": "Acceleration", "ans": "The rate of change of velocity over time."},
@@ -134,8 +131,8 @@ def generate_forces_problem(quiz_style="Both"):
             return item
 
 def get_next_question():
-    mode = st.session_state.get('selection_mode', 'Random')
-    quiz_style = st.session_state.get('quiz_style', 'Both')
+    mode = st.session_state.get('sci_selection_mode', 'Random')
+    quiz_style = st.session_state.get('sci_quiz_style', 'Both')
     
     if mode == "Random":
         return generate_forces_problem(quiz_style=quiz_style)
@@ -213,7 +210,6 @@ def get_next_question():
             raw_item["grading_rule"] = rule
             return raw_item
 
-# --- Visual Engine ---
 def draw_question_image(text, width_px=420, height_px=760):
     fig, ax = plt.subplots(figsize=(width_px/100, height_px/100), dpi=100)
     fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
@@ -287,13 +283,16 @@ def run_app():
         </style>
     """, unsafe_allow_html=True)
 
+    # Initialize ALL state variables properly
     if 'sci_generating' not in st.session_state: st.session_state.sci_generating = True
     if 'sci_pdf_bytes' not in st.session_state: st.session_state.sci_pdf_bytes = None
     if 'sci_problem_suite_refresh_id' not in st.session_state: st.session_state.sci_problem_suite_refresh_id = 0
-    if 'quiz_style' not in st.session_state: st.session_state.quiz_style = "Both"
-    if 'selection_mode' not in st.session_state: st.session_state.selection_mode = "Random"
+    if 'sci_quiz_style' not in st.session_state: st.session_state.sci_quiz_style = "Both"
+    if 'sci_selection_mode' not in st.session_state: st.session_state.sci_selection_mode = "Random"
     if 'sci_quiz_active' not in st.session_state: st.session_state.sci_quiz_active = False
     if 'sci_questions_answered' not in st.session_state: st.session_state.sci_questions_answered = 0
+    if 'sci_quiz_score' not in st.session_state: st.session_state.sci_quiz_score = 0
+    if 'sci_quiz_completed' not in st.session_state: st.session_state.sci_quiz_completed = False
 
     st.title("Motion & Forces Quiz 🚀")
 
@@ -303,7 +302,7 @@ def run_app():
             if st.session_state.sci_pdf_bytes is None:
                 if st.button("⚙️ Generate 20-Question PDF", use_container_width=True):
                     with st.spinner("Compiling PDF..."):
-                        st.session_state.sci_pdf_bytes = create_pdf_bytes(st.session_state.quiz_style)
+                        st.session_state.sci_pdf_bytes = create_pdf_bytes(st.session_state.sci_quiz_style)
                     st.rerun()
             else:
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -311,14 +310,15 @@ def run_app():
 
     with col_set:
         with st.popover("⚙️", use_container_width=True):
-            st.radio("Selection Mode", ["Random", "Cyclical", "Rehearse", "Quiz"], key="selection_mode", on_change=handle_settings_change)
-            st.radio("Quiz Style", ["Multiple Choice", "Written Answers", "Both"], key="quiz_style", on_change=handle_settings_change)
-            st.radio("Camera Mode", ["None", "App", "Native"], key="camera_mode", horizontal=True, on_change=handle_settings_change)
-            st.toggle("Canvas Controls", key="show_controls", on_change=handle_settings_change)
+            # Widget keys are now tightly bound to the sci_ prefix
+            st.radio("Selection Mode", ["Random", "Cyclical", "Rehearse", "Quiz"], key="sci_selection_mode", on_change=handle_settings_change)
+            st.radio("Quiz Style", ["Multiple Choice", "Written Answers", "Both"], key="sci_quiz_style", on_change=handle_settings_change)
+            st.radio("Camera Mode", ["None", "App", "Native"], key="sci_camera_mode", horizontal=True, on_change=handle_settings_change)
+            st.toggle("Canvas Controls", key="sci_show_controls", on_change=handle_settings_change)
 
     # --- START SCREEN GATE ---
-    if st.session_state.selection_mode == "Quiz" and not st.session_state.sci_quiz_active:
-        if st.session_state.get('sci_quiz_completed', False):
+    if st.session_state.sci_selection_mode == "Quiz" and not st.session_state.sci_quiz_active:
+        if st.session_state.sci_quiz_completed:
             st.success(f"🎉 Quiz Complete! You scored {st.session_state.sci_quiz_score} out of {st.session_state.sci_questions_answered}.")
             if st.button("Restart Quiz"):
                 handle_settings_change()
@@ -334,7 +334,7 @@ def run_app():
         return
 
     # --- RUNNING SCORE DASHBOARD ---
-    if st.session_state.selection_mode == "Quiz" and st.session_state.sci_quiz_active:
+    if st.session_state.sci_selection_mode == "Quiz" and st.session_state.sci_quiz_active:
         col1, col2, col3 = st.columns(3)
         col1.metric("Score", f"{st.session_state.sci_quiz_score}")
         col2.metric("Question", f"{st.session_state.sci_questions_answered + 1} / 20")
@@ -342,8 +342,8 @@ def run_app():
         col3.metric("Accuracy", f"{acc}%")
         st.divider()
 
-    # Safety catch: If science_problem_data is missing, force a generation
-    if st.session_state.sci_generating or 'science_problem_data' not in st.session_state:
+    # Safety catch
+    if st.session_state.sci_generating or 'sci_problem_data' not in st.session_state:
         st.session_state.sci_generating = True
         with st.spinner("Loading next question..."):
             p_data = get_next_question()
@@ -351,14 +351,14 @@ def run_app():
                 st.session_state.sci_quiz_active = False 
                 st.rerun() 
                 
-            st.session_state.science_problem_data = p_data
+            st.session_state.sci_problem_data = p_data
             if p_data["mode"] == "Written":
-                st.session_state.problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
+                st.session_state.sci_problem_image_context = draw_question_image(p_data["text"], width_px=420, height_px=420)
             st.session_state.sci_generating = False
             st.rerun()
 
     else:
-        p_data = st.session_state.science_problem_data
+        p_data = st.session_state.sci_problem_data
         
         if p_data["mode"] == "MCQ":
             st.write(f"### {p_data['text']}")
@@ -374,14 +374,14 @@ def run_app():
                 
                 if is_correct:
                     st.success("✅ Correct!")
-                    if st.session_state.selection_mode == "Quiz": 
+                    if st.session_state.sci_selection_mode == "Quiz": 
                         st.session_state.sci_quiz_score += 1
                 else:
                     st.error(f"❌ Incorrect. The correct answer is: {p_data['ans']}")
-                    if st.session_state.selection_mode == "Rehearse":
+                    if st.session_state.sci_selection_mode == "Rehearse":
                         st.session_state.sci_question_queue.append(p_data)
         else:
-            bg_image = st.session_state.problem_image_context
+            bg_image = st.session_state.sci_problem_image_context
             problem_context = f"Question: {p_data['text']}\nGrading Rule: {p_data.get('grading_rule', '')}"
             
             ai_marking_component.render_grading_suite(
@@ -390,13 +390,13 @@ def run_app():
                 key_prefix=f"sci_suite_{st.session_state.sci_problem_suite_refresh_id}",
                 solution_requirement="general",
                 problem_context=problem_context,
-                show_controls=st.session_state.get('show_controls', False),
-                camera_mode=st.session_state.get('camera_mode', 'App')
+                show_controls=st.session_state.get('sci_show_controls', False),
+                camera_mode=st.session_state.get('sci_camera_mode', 'App')
             )
 
         st.markdown('<div id="next-problem-btn"></div>', unsafe_allow_html=True)
         if st.button("Next Question", use_container_width=True):
-            if st.session_state.selection_mode == "Cyclical":
+            if st.session_state.sci_selection_mode == "Cyclical":
                 st.session_state.sci_question_queue.append(p_data)
             st.session_state.sci_generating = True
             st.session_state.sci_problem_suite_refresh_id += 1 
