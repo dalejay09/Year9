@@ -1,7 +1,6 @@
 import streamlit as st
 import random
 import io
-import json
 import textwrap
 import matplotlib
 matplotlib.use('Agg')
@@ -15,7 +14,7 @@ import ai_marking_component
 
 # --- Science Engine: MOTION & FORCES ---
 def generate_forces_problem(level="1", quiz_style="Both"):
-    # Pool 1: Multiple Choice Concepts
+    # Pool 1: Multiple Choice Concepts (Class 1)
     mcq_pool = [
         {"q": "A force is best described as:", "ans": "A push or a pull", "distractors": ["Energy stored in an object", "Matter moving through space", "Mass × speed"]},
         {"q": "Which of the following is a non-contact force?", "ans": "Gravity", "distractors": ["Friction", "Air resistance", "Upthrust"]},
@@ -29,28 +28,28 @@ def generate_forces_problem(level="1", quiz_style="Both"):
         {"q": "A floating boat experiences:", "ans": "Balanced weight and upthrust", "distractors": ["Weight only", "Upthrust only", "Friction only"]}
     ]
 
-    # Pool 2: Written / Calculation Concepts (Now expanded to 17 total questions)
+    # Pool 2: Written / Calculation Concepts (Class 3 and Class 4)
     written_pool = [
-        # Original 7
-        {"type": "define", "term": "Velocity", "ans": "Speed in a given direction (vector quantity)."},
-        {"type": "define", "term": "Acceleration", "ans": "The rate of change of velocity over time."},
-        {"type": "explain", "term": "Explain the difference between mass and weight.", "ans": "Mass is the amount of matter (kg), weight is the force of gravity acting on that mass (N)."},
-        {"type": "state", "term": "State Newton's Third Law.", "ans": "For every action force, there is an equal and opposite reaction force."},
-        {"type": "calc_net", "context": "A car experiences a driving force of {f1} N forward and friction of {f2} N backward."},
-        {"type": "calc_fma", "context": "Calculate the force required to accelerate a {m} kg mass at {a} m/s²."},
-        {"type": "calc_fma_mass", "context": "A skateboard is pushed with a force of {f} N and accelerates at {a} m/s². Calculate its mass."},
+        # Class 3: Fixed text, written definitions/explanations
+        {"class": 3, "type": "define", "term": "Velocity", "ans": "Speed in a given direction (vector quantity)."},
+        {"class": 3, "type": "define", "term": "Acceleration", "ans": "The rate of change of velocity over time."},
+        {"class": 3, "type": "explain", "term": "Explain the difference between mass and weight.", "ans": "Mass is the amount of matter (kg), weight is the force of gravity acting on that mass (N)."},
+        {"class": 3, "type": "state", "term": "State Newton's Third Law.", "ans": "For every action force, there is an equal and opposite reaction force."},
+        {"class": 3, "type": "define", "term": "Friction", "ans": "A contact force that opposes motion between two surfaces."},
+        {"class": 3, "type": "define", "term": "Net Force", "ans": "The overall or total force acting on an object when all individual forces are combined."},
+        {"class": 3, "type": "state", "term": "State Newton's First Law.", "ans": "An object will remain at rest or move at a constant speed in a straight line unless acted upon by an unbalanced force."},
+        {"class": 3, "type": "state", "term": "State Newton's Second Law.", "ans": "Force equals mass multiplied by acceleration (F = ma)."},
+        {"class": 3, "type": "explain", "term": "What happens to a moving car if the forward engine force and the backward friction force are exactly equal (balanced)?", "ans": "The car will continue moving at a constant speed (zero acceleration)."},
+        {"class": 3, "type": "explain", "term": "Explain how action and reaction forces allow a rocket to lift off the ground.", "ans": "The rocket pushes exhaust gases downwards (action), and the gases push the rocket upwards with an equal and opposite force (reaction)."},
+        {"class": 3, "type": "explain", "term": "A book rests on a table. Name the downward force and the upward support force acting on it.", "ans": "Downward force: Gravity (or Weight). Upward force: Normal force (or Support force)."},
         
-        # New 10 Added
-        {"type": "define", "term": "Friction", "ans": "A contact force that opposes motion between two surfaces."},
-        {"type": "define", "term": "Net Force", "ans": "The overall or total force acting on an object when all individual forces are combined."},
-        {"type": "state", "term": "State Newton's First Law.", "ans": "An object will remain at rest or move at a constant speed in a straight line unless acted upon by an unbalanced force."},
-        {"type": "state", "term": "State Newton's Second Law.", "ans": "Force equals mass multiplied by acceleration (F = ma)."},
-        {"type": "explain", "term": "What happens to a moving car if the forward engine force and the backward friction force are exactly equal (balanced)?", "ans": "The car will continue moving at a constant speed (zero acceleration)."},
-        {"type": "explain", "term": "Explain how action and reaction forces allow a rocket to lift off the ground.", "ans": "The rocket pushes exhaust gases downwards (action), and the gases push the rocket upwards with an equal and opposite force (reaction)."},
-        {"type": "explain", "term": "A book rests on a table. Name the downward force and the upward support force acting on it.", "ans": "Downward force: Gravity (or Weight). Upward force: Normal force (or Support force)."},
-        {"type": "calc_fma_accel", "context": "A force of {f} N is applied to a {m} kg box. Calculate its acceleration."},
-        {"type": "calc_weight", "context": "Calculate the weight of a {m} kg object on Earth. (Assume gravity g = 10 N/kg)."},
-        {"type": "calc_net_accel", "context": "A boat's engine provides a forward force of {f1} N, and water resistance pulls backward with {f1} N. What is the net force, and will the boat accelerate?"}
+        # Class 4: Fixed text with variables (calculations)
+        {"class": 4, "type": "calc_net", "context": "A car experiences a driving force of {f1} N forward and friction of {f2} N backward."},
+        {"class": 4, "type": "calc_fma", "context": "Calculate the force required to accelerate a {m} kg mass at {a} m/s²."},
+        {"class": 4, "type": "calc_fma_mass", "context": "A skateboard is pushed with a force of {f} N and accelerates at {a} m/s². Calculate its mass."},
+        {"class": 4, "type": "calc_fma_accel", "context": "A force of {f} N is applied to a {m} kg box. Calculate its acceleration."},
+        {"class": 4, "type": "calc_weight", "context": "Calculate the weight of a {m} kg object on Earth. (Assume gravity g = 10 N/kg)."},
+        {"class": 4, "type": "calc_net_accel", "context": "A boat's engine provides a forward force of {f1} N, and water resistance pulls backward with {f1} N. What is the net force, and will the boat accelerate?"}
     ]
 
     # 50/50 Likelihood Router
@@ -65,47 +64,57 @@ def generate_forces_problem(level="1", quiz_style="Both"):
         item = random.choice(mcq_pool)
         options = item["distractors"] + [item["ans"]]
         random.shuffle(options)
-        return {"mode": "MCQ", "text": item["q"], "options": options, "ans": item["ans"]}
+        return {
+            "class": 1,
+            "mode": "MCQ", 
+            "text": item["q"], 
+            "options": options, 
+            "ans": item["ans"],
+            "grading_rule": "Exact match multiple choice."
+        }
     else:
         item = random.choice(written_pool)
-        if item["type"] == "define":
-            text = f"Define the following term:\n\n{item['term']}"
-            return {"mode": "Written", "text": text, "ans": item["ans"]}
-        elif item["type"] == "explain" or item["type"] == "state":
-            text = f"{item['term']}"
-            return {"mode": "Written", "text": text, "ans": item["ans"]}
-        elif item["type"] == "calc_net":
-            f1, f2 = random.randint(500, 900), random.randint(100, 300)
-            text = item["context"].format(f1=f1, f2=f2) + "\n\nCalculate the net force and state its direction."
-            ans = f"{f1 - f2} N forward"
-            return {"mode": "Written", "text": text, "ans": ans}
-        elif item["type"] == "calc_fma":
-            m, a = random.randint(2, 12), random.randint(2, 8)
-            text = item["context"].format(m=m, a=a)
-            ans = f"{m * a} N"
-            return {"mode": "Written", "text": text, "ans": ans}
-        elif item["type"] == "calc_fma_mass":
-            m, a = random.randint(2, 10), random.randint(2, 6)
-            f = m * a
-            text = item["context"].format(f=f, a=a)
-            ans = f"{m} kg"
-            return {"mode": "Written", "text": text, "ans": ans}
-        elif item["type"] == "calc_fma_accel":
-            m, a = random.randint(2, 10), random.randint(2, 8)
-            f = m * a
-            text = item["context"].format(f=f, m=m)
-            ans = f"{a} m/s²"
-            return {"mode": "Written", "text": text, "ans": ans}
-        elif item["type"] == "calc_weight":
-            m = random.randint(5, 50)
-            text = item["context"].format(m=m)
-            ans = f"{m * 10} N"
-            return {"mode": "Written", "text": text, "ans": ans}
-        elif item["type"] == "calc_net_accel":
-            f1 = random.randint(300, 800)
-            text = item["context"].format(f1=f1)
-            ans = "Net force is 0 N. It will not accelerate."
-            return {"mode": "Written", "text": text, "ans": ans}
+        
+        # Class 3 Handlers
+        if item["class"] == 3:
+            if item["type"] == "define":
+                text = f"Define the following term:\n\n{item['term']}"
+            else:
+                text = f"{item['term']}"
+            rule = f"The student must articulate the core concept. Exact wording is not required. Core concept: {item['ans']}"
+            return {"class": 3, "mode": "Written", "text": text, "options": [], "grading_rule": rule, "ans": item["ans"]}
+            
+        # Class 4 Handlers
+        elif item["class"] == 4:
+            if item["type"] == "calc_net":
+                f1, f2 = random.randint(500, 900), random.randint(100, 300)
+                text = item["context"].format(f1=f1, f2=f2) + "\n\nCalculate the net force and state its direction."
+                ans = f"{f1 - f2} N forward"
+            elif item["type"] == "calc_fma":
+                m, a = random.randint(2, 12), random.randint(2, 8)
+                text = item["context"].format(m=m, a=a)
+                ans = f"{m * a} N"
+            elif item["type"] == "calc_fma_mass":
+                m, a = random.randint(2, 10), random.randint(2, 6)
+                f = m * a
+                text = item["context"].format(f=f, a=a)
+                ans = f"{m} kg"
+            elif item["type"] == "calc_fma_accel":
+                m, a = random.randint(2, 10), random.randint(2, 8)
+                f = m * a
+                text = item["context"].format(f=f, m=m)
+                ans = f"{a} m/s²"
+            elif item["type"] == "calc_weight":
+                m = random.randint(5, 50)
+                text = item["context"].format(m=m)
+                ans = f"{m * 10} N"
+            elif item["type"] == "calc_net_accel":
+                f1 = random.randint(300, 800)
+                text = item["context"].format(f1=f1)
+                ans = "Net force is 0 N. It will not accelerate."
+                
+            rule = f"The student must show working and reach the final answer of: {ans}. Do not penalize if they omit intermediate working as long as the final calculation is correct."
+            return {"class": 4, "mode": "Written", "text": text, "options": [], "grading_rule": rule, "ans": ans}
 
 # --- Visual Engine ---
 def draw_question_image(text, width_px=420, height_px=760):
@@ -232,8 +241,8 @@ def run_app():
         else:
             bg_image = st.session_state.problem_image_context
             
-            # Blind Marker: AI only gets the question context, no answer key!
-            problem_context = f"Science Question: {p_data['text']}"
+            # Using our new architecture to pass rules to the blind marker!
+            problem_context = f"Question: {p_data['text']}\nGrading Rule: {p_data.get('grading_rule', '')}"
             
             ai_marking_component.render_grading_suite(
                 bg_image=bg_image,
