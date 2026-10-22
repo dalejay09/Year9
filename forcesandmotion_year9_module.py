@@ -137,29 +137,23 @@ def get_next_question():
     if mode == "Random":
         return generate_forces_problem(quiz_style=quiz_style)
         
-    if 'sci_question_queue' not in st.session_state or not st.session_state.sci_question_queue:
-        if mode == "Quiz":
-            st.session_state.sci_quiz_score = 0
-            st.session_state.sci_questions_answered = 0
-            st.session_state.sci_quiz_completed = False
+    if mode == "Quiz":
+        if not st.session_state.get('sci_question_queue'):
+            # The queue is empty and we are in Quiz mode: End the quiz!
+            st.session_state.sci_quiz_completed = True
+            return None
+        raw_item = st.session_state.sci_question_queue.pop(0)
+    else:
+        # Cyclical or Rehearse mode - seamlessly refill the queue if empty
+        if not st.session_state.get('sci_question_queue'):
+            mcq_pool, written_pool = get_all_problems()
+            combined_pool = []
+            if quiz_style in ["Multiple Choice", "Both"]: combined_pool.extend(mcq_pool)
+            if quiz_style in ["Written Answers", "Both"]: combined_pool.extend(written_pool)
+            random.shuffle(combined_pool)
+            st.session_state.sci_question_queue = combined_pool
             
-        mcq_pool, written_pool = get_all_problems()
-        combined_pool = []
-        if quiz_style in ["Multiple Choice", "Both"]: combined_pool.extend(mcq_pool)
-        if quiz_style in ["Written Answers", "Both"]: combined_pool.extend(written_pool)
-        
-        random.shuffle(combined_pool)
-        
-        if mode == "Quiz" and len(combined_pool) > 20:
-            combined_pool = combined_pool[:20]
-            
-        st.session_state.sci_question_queue = combined_pool
-        
-    if mode == "Quiz" and not st.session_state.sci_question_queue:
-        st.session_state.sci_quiz_completed = True
-        return None
-        
-    raw_item = st.session_state.sci_question_queue.pop(0)
+        raw_item = st.session_state.sci_question_queue.pop(0)
     
     if raw_item.get("mode") == "MCQ":
         options = raw_item["distractors"] + [raw_item["ans"]]
@@ -310,7 +304,6 @@ def run_app():
 
     with col_set:
         with st.popover("⚙️", use_container_width=True):
-            # Widget keys are now tightly bound to the sci_ prefix
             st.radio("Selection Mode", ["Random", "Cyclical", "Rehearse", "Quiz"], key="sci_selection_mode", on_change=handle_settings_change)
             st.radio("Quiz Style", ["Multiple Choice", "Written Answers", "Both"], key="sci_quiz_style", on_change=handle_settings_change)
             st.radio("Camera Mode", ["None", "App", "Native"], key="sci_camera_mode", horizontal=True, on_change=handle_settings_change)
@@ -330,24 +323,36 @@ def run_app():
             st.session_state.sci_quiz_active = True
             st.session_state.sci_quiz_score = 0
             st.session_state.sci_questions_answered = 0
+            st.session_state.sci_quiz_completed = False
+            
+            # Explicitly build the 20-question queue right at the start
+            mcq_pool, written_pool = get_all_problems()
+            combined_pool = []
+            if st.session_state.sci_quiz_style in ["Multiple Choice", "Both"]: combined_pool.extend(mcq_pool)
+            if st.session_state.sci_quiz_style in ["Written Answers", "Both"]: combined_pool.extend(written_pool)
+            random.shuffle(combined_pool)
+            st.session_state.sci_question_queue = combined_pool[:20]
             st.rerun()
         return
 
     # --- RUNNING SCORE DASHBOARD ---
     if st.session_state.sci_selection_mode == "Quiz" and st.session_state.sci_quiz_active:
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Score", f"{st.session_state.sci_quiz_score}")
-        col2.metric("Question", f"{st.session_state.sci_questions_answered + 1} / 20")
         acc = int((st.session_state.sci_quiz_score / max(1, st.session_state.sci_questions_answered)) * 100) if st.session_state.sci_questions_answered > 0 else 0
-        col3.metric("Accuracy", f"{acc}%")
-        st.divider()
+        st.markdown(
+            f"<div style='text-align: center; padding: 10px; background-color: rgba(128, 128, 128, 0.1); border-radius: 5px; margin-bottom: 15px;'>"
+            f"<b>Score:</b> {st.session_state.sci_quiz_score} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"<b>Question:</b> {st.session_state.sci_questions_answered + 1} / 20 &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"<b>Accuracy:</b> {acc}%"
+            f"</div>", 
+            unsafe_allow_html=True
+        )
 
-    # Safety catch
     if st.session_state.sci_generating or 'sci_problem_data' not in st.session_state:
         st.session_state.sci_generating = True
         with st.spinner("Loading next question..."):
             p_data = get_next_question()
             if p_data is None: 
+                # The quiz naturally ended when the queue ran out
                 st.session_state.sci_quiz_active = False 
                 st.rerun() 
                 
